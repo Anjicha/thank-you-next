@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Thank You, Next</title>
+  <!-- Apple iOS PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Thank You, Next">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1c1c1e">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+  <!-- APP HEADER & NAVIGATION -->
+  <header class="app-header">
+    <div class="header-left">
+      <span class="app-title">Thank You, Next</span>
+      <div class="segmented-control">
+        <button id="tabPlanner" class="segment-btn active" onclick="switchView('planner')">Planer & Kalendar</button>
+        <button id="tabTree" class="segment-btn" onclick="switchView('tree')">Drvo</button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="btn-icon" onclick="openArchiveModal()" title="Pregledaj arhivirane zadatke">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="21 8 21 21 3 21 3 8"></polyline>
+          <rect x="1" y="3" width="22" height="5"></rect>
+          <line x1="10" y1="12" x2="14" y2="12"></line>
+        </svg>
+        <span>Arhiva</span>
+      </button>
+
+      <button class="btn-icon" id="soundToggleBtn" onclick="toggleSound()" title="Uključi / Isključi zvuk">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+        <span id="soundLabel">Zvuk: Uključen</span>
+      </button>
+
+      <button class="btn-icon" id="notifBtn" onclick="openNotifSettingsModal()" title="Postavke obavijesti i test podsjetnika">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span id="notifLabel">Obavijesti: Uključene</span>
+      </button>
+
+      <button class="btn-primary" onclick="openNewTaskModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Novi zadatak</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWS CONTAINER -->
+  <main class="view-container">
+
+    <!-- VIEW 1: PLANER & KALENDAR (SPLIT SCREEN) -->
+    <section id="viewPlanner" class="view-page active">
+      <div class="split-view">
+        
+        <!-- TOP HALF: MICROSOFT PLANNER STIL PO KATEGORIJAMA -->
+        <div class="planner-half">
+          <div class="section-toolbar">
+            <span class="section-label">Planer po kategorijama</span>
+            <button class="btn-icon" onclick="openNewCategoryModal()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Nova kategorija</span>
+            </button>
+          </div>
+
+          <div class="categories-scroll-wrapper" id="plannerCategoriesContainer">
+            <!-- Dynamic Category Columns Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- DRAGGABLE SPLIT RESIZER -->
+        <div class="split-resizer" id="splitResizer" title="Povucite gore/dolje za promjenu veličine kalendara">
+          <div class="resizer-handle"></div>
+        </div>
+
+        <!-- BOTTOM HALF: APPLE KALENDAR STIL -->
+        <div class="calendar-half">
+          <div class="calendar-header">
+            <div class="cal-nav">
+              <div class="cal-month-stepper">
+                <button class="cal-btn icon-only" onclick="prevMonth()" title="Prethodni mjesec">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <span class="cal-title" id="calMonthYearTitle">Januar 2026</span>
+                <button class="cal-btn icon-only" onclick="nextMonth()" title="Sljedeći mjesec">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <button class="cal-btn" id="btnToggleCalSize" onclick="toggleCalendarMaximize()" style="margin-left: 8px;">Povećaj kalendar</button>
+            </div>
+            <div style="font-size: 11px; color: var(--text-tertiary);">
+              Prevucite zadatak na željeni dan u kalendaru
+            </div>
+          </div>
+
+          <div class="calendar-weekdays">
+            <div class="weekday-cell">Pon</div>
+            <div class="weekday-cell">Uto</div>
+            <div class="weekday-cell">Sri</div>
+            <div class="weekday-cell">Čet</div>
+            <div class="weekday-cell">Pet</div>
+            <div class="weekday-cell">Sub</div>
+            <div class="weekday-cell">Ned</div>
+          </div>
+
+          <div class="calendar-grid" id="calendarGrid">
+            <!-- 35 or 42 Day Cells rendered by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- VIEW 2: DRVO (MINIMALIST TREE / MIND-MAP) -->
+    <section id="viewTree" class="view-page">
+      <div class="tree-view-wrapper">
+        <div class="tree-canvas" id="treeCanvas">
+          <!-- Dynamic Tree Structure Rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: DETALJI ZADATKA -->
+  <div class="modal-overlay" id="taskModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <input type="text" id="taskModalTitleInput" class="modal-header-input" placeholder="Upišite naziv zadatka..." autocomplete="off">
+        <button class="modal-close-btn" onclick="closeTaskModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row" style="margin-bottom: 4px;">
+          <div class="form-group" style="flex: 1;">
+            <label class="form-label">Kategorija</label>
+            <select id="taskModalCategorySelect" class="form-input" onchange="handleTaskModalCategoryChange(this.value)"></select>
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label class="form-label">Podkategorija</label>
+            <select id="taskModalSubcategorySelect" class="form-input"></select>
+          </div>
+        </div>
+
+        <div id="taskModalMetaStrip" style="font-size: 11px; color: var(--text-tertiary); display: flex; align-items: center; justify-content: flex-end; padding-bottom: 2px;">
+          <!-- Zone info injected by JS -->
+        </div>
+
+        <div class="form-row" id="dateRowContainer">
+          <div class="form-group">
+            <label class="form-label">Datum</label>
+            <input type="date" id="taskDateInput" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Podsjetnik (Alert)</label>
+            <input type="time" id="taskTimeInput" class="form-input" value="11:00">
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Prati sutra (Follow-up)</span>
+            <span class="toggle-desc">Kad prekrižiš zadatak, stvara se nastavak za sutra</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="taskFollowUpCheck">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button class="btn-icon" style="color: var(--danger-color); border-color: rgba(255, 59, 48, 0.3);" onclick="deleteCurrentTask()" title="Izbriši zadatak">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Izbriši</span>
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-secondary" onclick="closeTaskModal()">Odustani</button>
+          <button class="btn-primary" onclick="saveTaskModal()">Spremi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input type="color" id="globalColorPicker" class="hidden-color-input" onchange="applyCategoryColorChange(event)">
+
+  <!-- MODAL: NOVA KATEGORIJA -->
+  <div class="modal-overlay" id="categoryModal">
+    <div class="modal-card" style="width: 360px;">
+      <div class="modal-header">
+        <span class="modal-title">Nova kategorija</span>
+        <button class="modal-close-btn" onclick="closeCategoryModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Naziv kategorije</label>
+          <input type="text" id="catNameInput" class="form-input" placeholder="npr. Financije, Privatno..." autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Boja oznake</label>
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+            <input type="color" id="catColorInput" value="#007AFF" style="width: 40px; height: 32px; border: none; border-radius: 4px; cursor: pointer; background: transparent;">
+            <span style="font-size: 12px; color: var(--text-secondary);">Odaberite boju za kalendar i kartice</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Format kategorije</label>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px;">
+              <input type="radio" name="catTypeInput" value="planner" checked style="margin-top: 2px;">
+              <div>
+                <strong>Planer sa 4 zone</strong>
+                <div style="font-size: 11px; color: var(--text-secondary);">U kalendaru, Ovih dana, Dugoročno, Ideje (za posao i projekte)</div>
+              </div>
+            </label>
+            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px;">
+              <input type="radio" name="catTypeInput" value="simple" style="margin-top: 2px;">
+              <div>
+                <strong>Jednostavna lista</strong>
+                <div style="font-size: 11px; color: var(--text-secondary);">Jedan čist popis stavki (za "Kupiti", namirnice, brze popise)</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeCategoryModal()">Odustani</button>
+        <button class="btn-primary" onclick="saveCategoryModal()">Dodaj kategoriju</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVA PODKATEGORIJA (ZA DRVO) -->
+  <div class="modal-overlay" id="subcategoryModal">
+    <div class="modal-card" style="width: 360px;">
+      <div class="modal-header">
+        <span class="modal-title">Nova podkategorija</span>
+        <button class="modal-close-btn" onclick="closeSubcatModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="subcatTargetCategoryId">
+        <div class="form-group">
+          <label class="form-label">Naziv podkategorije</label>
+          <input type="text" id="subcatNameInput" class="form-input" placeholder="npr. Web stranica, Cjenici, Renovacija..." autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Format podkategorije</label>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px;">
+              <input type="radio" name="subcatTypeInput" value="planner" checked style="margin-top: 2px;">
+              <div>
+                <strong>Planer sa 4 zone</strong>
+                <div style="font-size: 11px; color: var(--text-secondary);">U kalendaru, Ovih dana, Dugoročno, Ideje</div>
+              </div>
+            </label>
+            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px;">
+              <input type="radio" name="subcatTypeInput" value="simple" style="margin-top: 2px;">
+              <div>
+                <strong>Jednostavna lista</strong>
+                <div style="font-size: 11px; color: var(--text-secondary);">Jedan čist popis stavki (bez podjele na zone)</div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeSubcatModal()">Odustani</button>
+        <button class="btn-primary" onclick="saveSubcatModal()">Spremi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: POTVRDA BRISANJA KATEGORIJE -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card" style="width: 380px;">
+      <div class="modal-header">
+        <span class="modal-title">Potvrda brisanja</span>
+        <button class="modal-close-btn" onclick="closeConfirmModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmModalMessage" style="font-size: 13px; line-height: 1.4; color: var(--text-primary);"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeConfirmModal()">Odustani</button>
+        <button class="btn-primary" id="confirmModalActionBtn" style="background: var(--danger-color); color: #fff;">Obriši</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ARHIVIRANI ZADACI -->
+  <div class="modal-overlay" id="archiveModal">
+    <div class="modal-card" style="width: 500px; max-height: 80vh;">
+      <div class="modal-header">
+        <span class="modal-title">Arhiva završenih zadataka</span>
+        <button class="modal-close-btn" onclick="closeArchiveModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="overflow-y: auto; max-height: 55vh; gap: 8px;" id="archiveTasksList">
+        <!-- Rendered by JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeArchiveModal()">Zatvori</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST: SATISFYING COMPLETE & SMART FOLLOW-UP -->
+  <div class="toast-banner" id="toastBanner">
+    <span id="toastMessage">Zadatak dovršen.</span>
+    <button class="toast-btn" id="toastFollowUpBtn" onclick="handleToastFollowUp()">Stvori nastavak za sutra</button>
+    <button class="toast-btn cancel" onclick="hideToast()">Zatvori</button>
+  </div>
+
+  <!-- MODAL: PODSJETNIK / ALARM POPUP -->
+  <div class="modal-overlay" id="taskAlertModal">
+    <div class="modal-card" style="width: 400px; border-top: 3px solid var(--accent-color);">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="modal-title">Podsjetnik za zadatak</span>
+        </div>
+        <button class="modal-close-btn" onclick="closeTaskAlertModal()">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding-top: 4px;">
+        <div id="alertModalCategoryPill" style="margin-bottom: 6px;"></div>
+        <h3 id="alertModalTaskTitle" style="font-size: 15px; font-weight: 600; color: var(--text-primary); line-height: 1.35; word-break: break-word;"></h3>
+        <p id="alertModalTimeText" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;"></p>
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 6px;">
+          <button class="btn-secondary" onclick="snoozeAlert(10)" title="Odgodi za 10 minuta">+10 min</button>
+          <button class="btn-secondary" onclick="snoozeAlert(60)" title="Odgodi za 1 sat">+1 sat</button>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn-secondary" onclick="closeTaskAlertModal()">Zatvori</button>
+          <button class="btn-primary" id="alertModalCompleteBtn" onclick="completeAlertTask()">Završi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: POSTAVKE OBAVIJESTI I TEST -->
+  <div class="modal-overlay" id="notifSettingsModal">
+    <div class="modal-card" style="width: 460px;">
+      <div class="modal-header">
+        <span class="modal-title">Obavijesti i Alarmi na Računalu</span>
+        <button class="modal-close-btn" onclick="closeNotifSettingsModal()">&times;</button>
+      </div>
+
+      <div class="modal-body" style="gap: 12px; font-size: 13px; line-height: 1.5; color: var(--text-primary);">
+        <p>Aplikacija vas automatski obavještava u točno vrijeme postavljeno na zadatku:</p>
+        <ul style="padding-left: 20px; color: var(--text-secondary); font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
+          <li><strong>Dok je aplikacija otvorena:</strong> Iskače podsjetnik s opcijama za odgodu i završetak te se oglašava ugodan zvuk.</li>
+          <li><strong>Dok je aplikacija ugašena:</strong> Pozadinski servis šalje nativnu macOS obavijest u gornjem desnom kutu ekrana (banner) s nazivom zadatka i zvukom.</li>
+        </ul>
+
+        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 12px; line-height: 1.4;">
+          <strong>Aktivacija za rad dok je app ugašena:</strong>
+          <div style="color: var(--text-secondary); margin-top: 4px;">
+            Dvaput kliknite na <code>Instaliraj Obavijesti (Automatski pri paljenju Maca).command</code> u mapi aplikacije na Desktopu.
+          </div>
+        </div>
+
+        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-weight: 500; font-size: 12px;">Provjerite kako izgleda obavijest:</span>
+          <button class="btn-secondary" onclick="testNotificationNow()" style="padding: 4px 10px; font-size: 11px;">Testiraj odmah</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="closeNotifSettingsModal()">U redu</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
