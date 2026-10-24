@@ -28,6 +28,16 @@
     </div>
 
     <div class="header-right">
+      <button class="btn-icon theme-toggle-btn" id="mobileThemeToggleBtn" onclick="toggleMobileTheme()" title="Promijeni temu (Svijetla / Tamna)">
+        <span class="theme-icon-dark">🌙</span>
+        <span class="theme-icon-light" style="display:none;">☀️</span>
+      </button>
+
+      <button class="btn-icon" id="syncBtn" onclick="openSyncModal()" title="Poveži računalo i mobitel (Sinhronizacija)">
+        <span id="syncDot" class="sync-status-dot"></span>
+        <span id="syncLabel">Povezano</span>
+      </button>
+
       <button class="btn-icon" onclick="openArchiveModal()" title="Pregledaj arhivirane zadatke">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="21 8 21 21 3 21 3 8"></polyline>
@@ -99,21 +109,21 @@
             <div class="cal-nav">
               <div class="cal-month-stepper">
                 <button class="cal-btn icon-only" onclick="prevMonth()" title="Prethodni mjesec">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <polyline points="15 18 9 12 15 6"></polyline>
                   </svg>
                 </button>
                 <span class="cal-title" id="calMonthYearTitle">Januar 2026</span>
                 <button class="cal-btn icon-only" onclick="nextMonth()" title="Sljedeći mjesec">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <polyline points="9 18 15 12 9 6"></polyline>
                   </svg>
                 </button>
               </div>
-              <button class="cal-btn" id="btnToggleCalSize" onclick="toggleCalendarMaximize()" style="margin-left: 8px;">Povećaj kalendar</button>
+              <button class="cal-btn" id="btnToggleCalSize" onclick="toggleCalendarMaximize()" style="margin-left: 6px;">Povećaj</button>
             </div>
-            <div style="font-size: 11px; color: var(--text-tertiary);">
-              Prevucite zadatak na željeni dan u kalendaru
+            <div class="cal-header-hint" style="font-size: 9.5px; color: var(--text-tertiary); letter-spacing: -0.1px;">
+              Prevucite zadatak na željeni dan
             </div>
           </div>
 
@@ -129,6 +139,20 @@
 
           <div class="calendar-grid" id="calendarGrid">
             <!-- 35 or 42 Day Cells rendered by JS -->
+          </div>
+
+          <!-- APPLE CALENDAR STYLE DAY AGENDA (ISPOD KALENDARA) -->
+          <div class="calendar-day-agenda" id="calendarDayAgenda">
+            <div class="day-agenda-header">
+              <div class="day-agenda-date-info">
+                <span class="day-agenda-icon">📅</span>
+                <span class="day-agenda-title" id="dayAgendaTitle">Događaji za danas</span>
+              </div>
+              <button class="cal-btn" onclick="openNewTaskForSelectedDay()" style="font-size: 11px; padding: 3px 8px;">+ Novi zadatak</button>
+            </div>
+            <div class="day-agenda-list" id="dayAgendaList">
+              <!-- Rendered by JS -->
+            </div>
           </div>
         </div>
 
@@ -404,6 +428,45 @@
 
       <div class="modal-footer">
         <button class="btn-primary" onclick="closeNotifSettingsModal()">U redu</button>
+      </div>
+    </div>
+  <!-- MODAL: SINHRONIZACIJA U REALNOM VREMENU (MAC & IPHONE) -->
+  <div class="modal-overlay" id="syncModal">
+    <div class="modal-card" style="width: 440px;">
+      <div class="modal-header">
+        <span class="modal-title">Sinhronizacija u Realnom Vremenu</span>
+        <button class="modal-close-btn" onclick="closeSyncModal()">&times;</button>
+      </div>
+
+      <div class="modal-body" style="gap: 12px; font-size: 13px; line-height: 1.5; color: var(--text-primary);">
+        <p>Povežite svoj računar i iPhone tako da se svi zadaci automatski ažuriraju u realnom vremenu na oba uređaja.</p>
+
+        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <span style="font-weight: 600; font-size: 12px;">Status veze:</span>
+            <span id="syncModalStatusBadge" style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(52, 199, 89, 0.15); color: var(--success-color); font-weight: 600;">Spremno</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-secondary);" id="syncModalLastSyncTime">Zadnja provjera: upravo</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tvoj Privatni Sync Kod (Isti kod unesi na računalu i mobitelu):</label>
+          <div style="display: flex; gap: 8px; margin-top: 4px;">
+            <input type="text" id="syncRoomInput" class="form-input" placeholder="npr. ANJA-NEXT-2026" style="flex: 1; font-family: monospace; font-weight: 600; text-transform: uppercase;">
+            <button class="btn-secondary" onclick="generateRandomSyncKey()" style="white-space: nowrap; font-size: 11px;">Novi kod</button>
+          </div>
+          <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;">
+            Kada na oba uređaja upišete isti kod i kliknete "Spremi", oni su trajno povezani.
+          </span>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button class="btn-secondary" onclick="syncNowManual()">Sinhronizuj odmah</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-secondary" onclick="closeSyncModal()">Zatvori</button>
+          <button class="btn-primary" onclick="saveSyncSettings()">Spremi i poveži</button>
+        </div>
       </div>
     </div>
   </div>

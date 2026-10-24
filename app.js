@@ -154,6 +154,7 @@ let targetColorCategoryId = null;
 let activeDayInlineDate = null;
 let activeCalendarInlineCategoryId = null;
 let categoryToDeleteId = null;
+let selectedCalendarDate = getTodayStr();
 
 // HELPERS
 function getTodayStr() {
@@ -275,14 +276,18 @@ window.receiveNativeData = function(nativeData) {
   }
 };
 
-function saveData() {
+function saveData(skipCloudSync = false) {
   try {
+    appState.lastModified = Date.now();
     localStorage.setItem("thank_you_next_data", JSON.stringify(appState));
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeApp) {
       window.webkit.messageHandlers.nativeApp.postMessage({
         action: "saveData",
         payload: JSON.stringify(appState)
       });
+    }
+    if (!skipCloudSync && typeof CloudSync !== "undefined") {
+      CloudSync.schedulePush();
     }
   } catch (e) {
     console.error("Failed to save data:", e);
@@ -1035,6 +1040,8 @@ function renderCalendar() {
   if (weekHeightsChanged) {
     saveData();
   }
+
+  renderDayAgenda(typeof selectedCalendarDate !== "undefined" ? selectedCalendarDate : getTodayStr());
 }
 
 function setupSingleWeekResizer(resizer, weekRow, weekIndex) {
@@ -1081,23 +1088,24 @@ function setupSingleWeekResizer(resizer, weekRow, weekIndex) {
 
 function createDayCell(dayNumber, dateStr, isOtherMonth, isToday) {
   const hasActiveInput = activeDayInlineDate === dateStr;
+  const isSelected = (typeof selectedCalendarDate !== "undefined" && selectedCalendarDate === dateStr);
   const cell = document.createElement("div");
-  cell.className = `day-cell ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'is-today' : ''} ${hasActiveInput ? 'has-active-input' : ''}`;
+  cell.className = `day-cell ${isOtherMonth ? 'other-month' : ''} ${isToday ? 'is-today' : ''} ${isSelected ? 'selected-day' : ''} ${hasActiveInput ? 'has-active-input' : ''}`;
   cell.dataset.date = dateStr;
   cell.tabIndex = 0;
 
   cell.onclick = (e) => {
-    if (e.target.closest(".calendar-task-pill") || e.target.closest(".day-inline-input-wrap") || e.target.closest(".day-plus-btn")) {
+    if (e.target.closest(".day-inline-input-wrap") || e.target.closest(".day-plus-btn")) {
       return;
     }
-    openDayInlineInput(dateStr);
+    selectCalendarDate(dateStr);
   };
 
   cell.onkeydown = (e) => {
     if (e.target !== cell) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      openDayInlineInput(dateStr);
+      selectCalendarDate(dateStr);
     } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       openDayInlineInput(dateStr, e.key);
@@ -1188,46 +1196,121 @@ function createDayCell(dayNumber, dateStr, isOtherMonth, isToday) {
   const dayTasks = appState.tasks.filter(t => t.zone === "calendar" && t.date === dateStr && !t.archived);
   dayTasks.sort((a, b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0) || (a.order || 0) - (b.order || 0));
 
-  dayTasks.forEach(task => {
-    const cat = appState.categories.find(c => c.id === task.categoryId) || { color: "#636366" };
-    
-    const pill = document.createElement("div");
-    pill.className = `calendar-task-pill ${task.completed ? 'completed' : ''}`;
-    pill.id = `cal-task-${task.id}`;
-    pill.style.borderLeftColor = cat.color;
-    pill.draggable = true;
-    pill.ondragstart = (e) => handleTaskDragStart(e, task.id);
-    pill.ondragend = handleTaskDragEnd;
-    pill.onclick = (e) => {
+  // Render micro pills inside day cell (very tiny, clean, no times, no checkboxes)
+  const maxMicro = 3;
+  dayTasks.slice(0, maxMicro).forEach(task => {
+    const cat = appState.categories.find(c => c.id === task.categoryId) || { color: "#007AFF" };
+    const micro = document.createElement("div");
+    micro.className = `calendar-micro-pill ${task.completed ? 'completed' : ''}`;
+    micro.id = `cal-task-${task.id}`;
+    micro.style.borderLeftColor = cat.color || "#007AFF";
+    micro.title = task.title + (task.timeAlert ? ` (${task.timeAlert})` : "");
+    micro.textContent = task.title;
+    micro.draggable = true;
+    micro.ondragstart = (e) => handleTaskDragStart(e, task.id);
+    micro.ondragend = handleTaskDragEnd;
+    micro.onclick = (e) => {
       e.stopPropagation();
-      editTask(task.id);
+      selectCalendarDate(dateStr);
     };
-
-    // SHOW TIME ON CALENDAR TASK PILL
-    const hasCustomTime = !!task.timeAlert;
-    const timeHtml = hasCustomTime ? `<span class="calendar-task-time">${task.timeAlert}</span>` : "";
-
-    pill.innerHTML = `
-      <div class="calendar-task-checkbox ${task.completed ? 'checked' : ''}" 
-           title="${task.completed ? 'Označi kao nezavršeno' : 'Označi kao završeno'}"
-           onclick="event.stopPropagation(); completeTask('${task.id}', event)">
-        <svg width="7" height="7" viewBox="0 0 24 24" fill="none">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      </div>
-      ${timeHtml}
-      <span class="calendar-task-title">${escapeHtml(task.title)}</span>
-      <button class="calendar-task-delete-btn" 
-              onclick="handleCalendarTaskDelete('${task.id}', event)" 
-              title="Obriši iz kalendara">✕</button>
-    `;
-
-    tasksContainer.appendChild(pill);
+    tasksContainer.appendChild(micro);
   });
+
+  if (dayTasks.length > maxMicro) {
+    const moreBadge = document.createElement("div");
+    moreBadge.className = "calendar-more-badge";
+    moreBadge.textContent = `+${dayTasks.length - maxMicro} još`;
+    tasksContainer.appendChild(moreBadge);
+  }
 
   cell.appendChild(tasksContainer);
 
   return cell;
+}
+
+function selectCalendarDate(dateStr) {
+  selectedCalendarDate = dateStr;
+  document.querySelectorAll(".day-cell.selected-day").forEach(el => el.classList.remove("selected-day"));
+  const targetCell = document.querySelector(`.day-cell[data-date="${dateStr}"]`);
+  if (targetCell) {
+    targetCell.classList.add("selected-day");
+  }
+  renderDayAgenda(dateStr);
+}
+
+function renderDayAgenda(dateStr) {
+  const container = document.getElementById("dayAgendaList");
+  const titleEl = document.getElementById("dayAgendaTitle");
+  if (!container || !titleEl) return;
+
+  const targetDate = dateStr || (typeof selectedCalendarDate !== "undefined" ? selectedCalendarDate : null) || getTodayStr();
+  selectedCalendarDate = targetDate;
+
+  const today = getTodayStr();
+  const dParts = targetDate.split("-");
+  const year = parseInt(dParts[0], 10);
+  const month = parseInt(dParts[1], 10) - 1;
+  const day = parseInt(dParts[2], 10);
+  const dObj = new Date(year, month, day);
+
+  const monthNames = [
+    "januar", "februar", "mart", "april", "maj", "juni",
+    "juli", "august", "septembar", "oktobar", "novembar", "decembar"
+  ];
+  const dayNames = [
+    "Nedjelja", "Ponedjeljak", "Utorak", "Srijeda", "Četvrtak", "Petak", "Subota"
+  ];
+
+  let dateLabel = `${dayNames[dObj.getDay()]}, ${day}. ${monthNames[month]}`;
+  if (targetDate === today) {
+    dateLabel = `Danas • ${day}. ${monthNames[month]}`;
+  }
+  titleEl.textContent = dateLabel;
+
+  const dayTasks = appState.tasks.filter(t => t.zone === "calendar" && t.date === targetDate && !t.archived);
+  dayTasks.sort((a, b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0) || (a.timeAlert || "").localeCompare(b.timeAlert || ""));
+
+  if (dayTasks.length === 0) {
+    container.innerHTML = `
+      <div class="agenda-empty-state">
+        Nema zadataka za ${targetDate === today ? "danas" : "ovaj dan"}. Kliknite "+ Novi zadatak" za dodavanje.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = dayTasks.map(task => {
+    const cat = appState.categories.find(c => c.id === task.categoryId) || { name: "Općenito", color: "#007AFF" };
+    const timeDisplay = task.timeAlert ? `⏰ ${task.timeAlert}` : "Cijeli dan";
+
+    return `
+      <div class="agenda-task-item ${task.completed ? 'completed' : ''}" id="agenda-task-${task.id}">
+        <div class="agenda-task-left">
+          <div class="agenda-checkbox ${task.completed ? 'checked' : ''}" 
+               title="${task.completed ? 'Označi kao nezavršeno' : 'Označi kao završeno'}"
+               onclick="completeTask('${task.id}', event)">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="agenda-cat-badge" style="background-color: ${cat.color || '#007AFF'};">${escapeHtml(cat.name)}</span>
+          <span class="agenda-task-title" onclick="editTask('${task.id}')" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</span>
+        </div>
+        <div class="agenda-task-right">
+          <span class="agenda-task-time">${timeDisplay}</span>
+          <button class="agenda-delete-btn" onclick="handleCalendarTaskDelete('${task.id}', event)" title="Obriši iz kalendara">✕</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function openNewTaskForSelectedDay() {
+  openNewTaskModal();
+  const dateInput = document.getElementById("taskDateInput");
+  if (dateInput && typeof selectedCalendarDate !== "undefined") {
+    dateInput.value = selectedCalendarDate;
+  }
 }
 
 let calendarCatMenuHideTimer = null;
@@ -3442,14 +3525,258 @@ function setupMobileTouchDrag() {
   document.addEventListener("touchcancel", endTouchDrag);
 }
 
+// ========================================================
+// THEME SWITCHER (FOR MOBILE PHONE ONLY; LAPTOP UNTOUCHED)
+// ========================================================
+function initTheme() {
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    const savedTheme = localStorage.getItem("thank_you_next_mobile_theme") || "dark";
+    applyTheme(savedTheme);
+  } else {
+    document.body.classList.remove("theme-light", "theme-dark");
+  }
+}
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 768) {
+    document.body.classList.remove("theme-light", "theme-dark");
+  }
+});
+
+function toggleMobileTheme() {
+  const current = document.body.classList.contains("theme-light") ? "light" : "dark";
+  const next = current === "light" ? "dark" : "light";
+  applyTheme(next);
+  localStorage.setItem("thank_you_next_mobile_theme", next);
+}
+
+function applyTheme(theme) {
+  document.body.classList.remove("theme-light", "theme-dark");
+  document.body.classList.add(theme === "light" ? "theme-light" : "theme-dark");
+  const darkIcon = document.querySelector(".theme-icon-dark");
+  const lightIcon = document.querySelector(".theme-icon-light");
+  if (darkIcon && lightIcon) {
+    if (theme === "light") {
+      darkIcon.style.display = "inline";
+      lightIcon.style.display = "none";
+    } else {
+      darkIcon.style.display = "none";
+      lightIcon.style.display = "inline";
+    }
+  }
+}
+
+// ========================================================
+// REAL-TIME CLOUD SYNCHRONIZATION (LAPTOP <-> IPHONE)
+// ========================================================
+const CloudSync = {
+  syncKey: null,
+  databaseUrl: null,
+  isPushing: false,
+  pushTimer: null,
+  pollTimer: null,
+
+  init() {
+    this.syncKey = localStorage.getItem("thank_you_next_sync_key") || "ANJA-NEXT-2026";
+    this.databaseUrl = localStorage.getItem("thank_you_next_sync_db_url") || "";
+    this.updateStatusBadge("Povezano", "success");
+
+    // Background sync polling every 4 seconds
+    this.pollTimer = setInterval(() => {
+      this.pullUpdate();
+    }, 4000);
+
+    // Pull on window focus / tab visibility
+    window.addEventListener("focus", () => this.pullUpdate());
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) this.pullUpdate();
+    });
+
+    // Initial pull
+    setTimeout(() => this.pullUpdate(), 1500);
+  },
+
+  getEndpoint() {
+    if (this.databaseUrl) {
+      let base = this.databaseUrl.trim().replace(/\/+$/, "");
+      if (!base.endsWith(".json")) base += `/sync/${encodeURIComponent(this.syncKey)}.json`;
+      return base;
+    }
+    return `https://thankyounext-sync-default-rtdb.firebaseio.com/sync/${encodeURIComponent(this.syncKey)}.json`;
+  },
+
+  schedulePush() {
+    clearTimeout(this.pushTimer);
+    this.pushTimer = setTimeout(() => {
+      this.pushUpdate();
+    }, 500);
+  },
+
+  async pushUpdate() {
+    if (this.isPushing) return;
+    this.isPushing = true;
+    this.setSyncingIndicator(true);
+
+    try {
+      const payload = {
+        state: appState,
+        lastModified: appState.lastModified || Date.now(),
+        clientDevice: (window.innerWidth <= 768 ? "mobile" : "desktop")
+      };
+
+      const res = await fetch(this.getEndpoint(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        this.updateStatusBadge("Povezano", "success");
+      }
+    } catch (e) {
+      this.updateStatusBadge("Offline", "offline");
+    } finally {
+      this.isPushing = false;
+      this.setSyncingIndicator(false);
+    }
+  },
+
+  async pullUpdate() {
+    if (this.isPushing) return;
+
+    try {
+      const res = await fetch(this.getEndpoint(), { cache: "no-store" });
+      if (!res.ok) return;
+
+      const remoteData = await res.json();
+      if (!remoteData || !remoteData.state) return;
+
+      const remoteMod = remoteData.lastModified || 0;
+      const localMod = appState.lastModified || 0;
+
+      if (remoteMod > localMod) {
+        appState = remoteData.state;
+        appState.lastModified = remoteMod;
+        saveData(true);
+        renderPlanner();
+        renderCalendar();
+        renderTree();
+        if (typeof renderDayAgenda === "function") {
+          renderDayAgenda(selectedCalendarDate || getTodayStr());
+        }
+        this.flashSyncSuccess();
+      }
+      this.updateStatusBadge("Povezano", "success");
+    } catch (e) {
+      // fail silently
+    }
+  },
+
+  setSyncingIndicator(isSyncing) {
+    const dot = document.getElementById("syncDot");
+    if (!dot) return;
+    if (isSyncing) {
+      dot.className = "sync-status-dot syncing";
+    } else {
+      dot.className = "sync-status-dot";
+    }
+  },
+
+  flashSyncSuccess() {
+    const dot = document.getElementById("syncDot");
+    const lbl = document.getElementById("syncLabel");
+    if (dot) {
+      dot.style.background = "#34C759";
+      dot.style.boxShadow = "0 0 8px rgba(52, 199, 89, 0.8)";
+      setTimeout(() => {
+        dot.style.boxShadow = "";
+      }, 1000);
+    }
+    if (lbl) {
+      lbl.textContent = "Ažurirano!";
+      setTimeout(() => {
+        lbl.textContent = "Povezano";
+      }, 2000);
+    }
+  },
+
+  updateStatusBadge(text, type) {
+    const badge = document.getElementById("syncModalStatusBadge");
+    const timeEl = document.getElementById("syncModalLastSyncTime");
+    const dot = document.getElementById("syncDot");
+    const lbl = document.getElementById("syncLabel");
+
+    if (dot) {
+      dot.className = `sync-status-dot ${type === "offline" ? "offline" : ""}`;
+    }
+    if (lbl && lbl.textContent !== "Ažurirano!") {
+      lbl.textContent = text;
+    }
+    if (badge) {
+      badge.textContent = text;
+      badge.style.color = type === "success" ? "var(--success-color)" : "var(--text-tertiary)";
+    }
+    if (timeEl) {
+      const now = new Date();
+      timeEl.textContent = `Zadnja provjera: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    }
+  }
+};
+
+function openSyncModal() {
+  const modal = document.getElementById("syncModal");
+  const input = document.getElementById("syncRoomInput");
+  const dbInput = document.getElementById("syncDatabaseUrlInput");
+  if (modal) modal.classList.add("active");
+  if (input) input.value = CloudSync.syncKey || "ANJA-NEXT-2026";
+  if (dbInput) dbInput.value = CloudSync.databaseUrl || "";
+  CloudSync.updateStatusBadge("Povezano", "success");
+}
+
+function closeSyncModal() {
+  const modal = document.getElementById("syncModal");
+  if (modal) modal.classList.remove("active");
+}
+
+function generateRandomSyncKey() {
+  const key = "ANJA-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+  const input = document.getElementById("syncRoomInput");
+  if (input) input.value = key;
+}
+
+function saveSyncSettings() {
+  const input = document.getElementById("syncRoomInput");
+  const dbInput = document.getElementById("syncDatabaseUrlInput");
+  if (input && input.value.trim()) {
+    CloudSync.syncKey = input.value.trim().toUpperCase();
+    localStorage.setItem("thank_you_next_sync_key", CloudSync.syncKey);
+  }
+  if (dbInput) {
+    CloudSync.databaseUrl = dbInput.value.trim();
+    localStorage.setItem("thank_you_next_sync_db_url", CloudSync.databaseUrl);
+  }
+  closeSyncModal();
+  showToast("Sync postavke spremljene. Povezivanje...", false);
+  CloudSync.pushUpdate();
+}
+
+function syncNowManual() {
+  showToast("Sinhronizacija u toku...", false);
+  CloudSync.pushUpdate();
+  CloudSync.pullUpdate();
+}
+
 // INIT
 window.addEventListener("DOMContentLoaded", () => {
+  initTheme();
   loadData();
   renderPlanner();
   renderCalendar();
   setupTreePan();
   setupSplitResizer();
   setupMobileTouchDrag();
+  CloudSync.init();
 
   // Register Service Worker for PWA
   if ("serviceWorker" in navigator) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thank-you-next-v2';
+const CACHE_NAME = 'thank-you-next-v3';
 const ASSETS_TO_CACHE = [
   './index.html',
   './app.css',

@@ -40,6 +40,67 @@
   }
 }
 
+/* EXPLICIT THEME OVERRIDES (Za telefon / mobilni preklopnik) */
+body.theme-light {
+  --bg-primary: #F2F2F7 !important;
+  --bg-card: #FFFFFF !important;
+  --bg-secondary: #E5E5EA !important;
+  --border-color: #D1D1D6 !important;
+  --border-subtle: #E5E5EA !important;
+  --text-primary: #000000 !important;
+  --text-secondary: #636366 !important;
+  --text-tertiary: #8E8E93 !important;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06) !important;
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08) !important;
+}
+
+body.theme-dark {
+  --bg-primary: #1C1C1E !important;
+  --bg-card: #2C2C2E !important;
+  --bg-secondary: #3A3A3C !important;
+  --border-color: #38383A !important;
+  --border-subtle: #2C2C2E !important;
+  --text-primary: #F2F2F7 !important;
+  --text-secondary: #AEAEB2 !important;
+  --text-tertiary: #8E8E93 !important;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2) !important;
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+
+/* Theme toggle button: HIDE on desktop / laptop! Laptop stays untouched */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+@media (min-width: 769px) {
+  .theme-toggle-btn {
+    display: none !important;
+  }
+}
+
+.sync-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success-color);
+  display: inline-block;
+  margin-right: 4px;
+}
+.sync-status-dot.syncing {
+  background: #FF9500;
+  animation: pulseSync 0.8s infinite alternate;
+}
+.sync-status-dot.offline {
+  background: var(--text-tertiary);
+}
+@keyframes pulseSync {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -713,31 +774,34 @@ body.dragging-task .tree-task-item:not(.dragging) * {
 }
 
 .calendar-header {
-  padding: 10px 20px;
+  height: 30px;
+  min-height: 30px;
+  padding: 2px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-card);
+  flex-shrink: 0;
 }
 
 .cal-nav {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .cal-month-stepper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cal-month-stepper .cal-title {
-  font-size: 14px;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: -0.2px;
-  min-width: 130px;
+  min-width: 95px;
   text-align: center;
   user-select: none;
 }
@@ -746,11 +810,12 @@ body.dragging-task .tree-task-item:not(.dragging) * {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 2px 7px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-primary);
   cursor: pointer;
+  line-height: 1.25;
 }
 
 .cal-btn:hover {
@@ -758,7 +823,7 @@ body.dragging-task .tree-task-item:not(.dragging) * {
 }
 
 .cal-btn.icon-only {
-  padding: 4px 8px;
+  padding: 2px 5px;
 }
 
 .calendar-weekdays {
@@ -836,15 +901,61 @@ body.dragging-task .tree-task-item:not(.dragging) * {
 
 .day-cell {
   background: var(--bg-card);
-  padding: 3px 4px;
+  padding: 2px 3px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
   position: relative;
   cursor: pointer;
   outline: none;
+}
+
+.day-cell.selected-day {
+  background: var(--bg-secondary) !important;
+  box-shadow: inset 0 0 0 1.5px var(--accent-color) !important;
+}
+
+.day-cell.selected-day .day-number {
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+.day-cell.selected-day.is-today .day-number {
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+/* Micro task pill inside month cell (clean, tiny font, no times) */
+.calendar-micro-pill {
+  font-size: 7.5px !important;
+  line-height: 1.15;
+  padding: 1px 3px;
+  margin: 1px 0;
+  border-radius: 2px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-left: 2px solid var(--accent-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+}
+
+.calendar-micro-pill.completed {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.calendar-more-badge {
+  font-size: 7px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  padding: 0 2px;
+  line-height: 1;
 }
 
 .day-cell:focus-visible {
@@ -1033,6 +1144,174 @@ body.dragging-task .calendar-task-checkbox {
   opacity: 1 !important;
   color: var(--danger-color);
   background: rgba(255, 59, 48, 0.12);
+}
+
+/* ========================================================
+   APPLE CALENDAR STYLE DAY AGENDA (ISPOD KALENDARA)
+   ======================================================== */
+.calendar-day-agenda {
+  flex-shrink: 0;
+  height: 190px;
+  max-height: 50%;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.day-agenda-header {
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.day-agenda-date-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.day-agenda-icon {
+  font-size: 13px;
+  display: inline-flex;
+}
+
+.day-agenda-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.day-agenda-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.agenda-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, border-color 0.15s;
+  gap: 10px;
+}
+
+.agenda-task-item:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.agenda-task-item.completed {
+  opacity: 0.55;
+}
+
+.agenda-task-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.agenda-checkbox {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  background: var(--bg-primary);
+}
+
+.agenda-checkbox.checked {
+  background: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.agenda-checkbox.checked svg {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+
+.agenda-cat-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.agenda-task-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.agenda-task-item.completed .agenda-task-title {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.agenda-task-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.agenda-task-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-color);
+  background: rgba(0, 122, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.agenda-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.agenda-delete-btn:hover {
+  color: var(--danger-color);
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.agenda-empty-state {
+  text-align: center;
+  padding: 20px 10px;
+  color: var(--text-tertiary);
+  font-size: 12px;
 }
 
 .simple-column-body {
@@ -1841,8 +2120,12 @@ input:checked + .slider:before {
     padding: 5px 7px;
   }
 
-  .header-right .btn-icon span {
-    display: none; /* Icon-only on mobile */
+  .header-right .btn-icon span:not(.sync-status-dot):not(.theme-icon-dark):not(.theme-icon-light) {
+    display: none; /* Icon-only on mobile, keep theme icons and sync dot */
+  }
+
+  .cal-header-hint {
+    display: none;
   }
 
   .btn-primary {
