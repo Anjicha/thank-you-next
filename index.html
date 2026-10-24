@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=4">
 </head>
 <body>
 
@@ -28,9 +28,9 @@
     </div>
 
     <div class="header-right">
-      <button class="btn-icon theme-toggle-btn" id="mobileThemeToggleBtn" onclick="toggleMobileTheme()" title="Promijeni temu (Svijetla / Tamna)">
-        <span class="theme-icon-dark">🌙</span>
-        <span class="theme-icon-light" style="display:none;">☀️</span>
+      <button class="btn-icon theme-toggle-btn" id="mobileThemeToggleBtn" onclick="toggleMobileTheme()" title="Promijeni temu">
+        <span id="themeToggleIcon" style="font-size: 14px;">☀️</span>
+        <span id="themeToggleText" style="font-size: 11px; font-weight: 600;">Svijetla</span>
       </button>
 
       <button class="btn-icon" id="syncBtn" onclick="openSyncModal()" title="Poveži računalo i mobitel (Sinhronizacija)">
@@ -471,6 +471,37 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- MODAL: MOBILE QUICK MOVE (PREMJESTI ZADATAK) -->
+  <div class="modal-overlay" id="mobileTaskMoveModal">
+    <div class="modal-card" style="max-width: 360px;">
+      <div class="modal-header">
+        <span class="modal-title" id="mobileMoveTaskTitle">Premjesti zadatak</span>
+        <button class="modal-close-btn" onclick="closeMobileTaskMoveModal()">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 2px;">Gdje želiš premjestiti ovaj zadatak?</div>
+        <button class="btn-secondary" onclick="moveActiveMobileTaskToToday()" style="justify-content: flex-start; padding: 10px 12px; font-size: 12.5px; font-weight: 500;">
+          📅 &nbsp; Danas u kalendar
+        </button>
+        <button class="btn-secondary" onclick="promptMoveActiveMobileTaskToDate()" style="justify-content: flex-start; padding: 10px 12px; font-size: 12.5px; font-weight: 500;">
+          🗓️ &nbsp; Odaberi dan u kalendaru...
+        </button>
+        <button class="btn-secondary" onclick="moveActiveMobileTaskToZone('soon')" style="justify-content: flex-start; padding: 10px 12px; font-size: 12.5px; font-weight: 500;">
+          ⚡ &nbsp; U zonu "Ovih dana"
+        </button>
+        <button class="btn-secondary" onclick="moveActiveMobileTaskToZone('longterm')" style="justify-content: flex-start; padding: 10px 12px; font-size: 12.5px; font-weight: 500;">
+          🎯 &nbsp; U zonu "Dugoročno"
+        </button>
+        <button class="btn-secondary" onclick="moveActiveMobileTaskToZone('ideas')" style="justify-content: flex-start; padding: 10px 12px; font-size: 12.5px; font-weight: 500;">
+          💡 &nbsp; U zonu "Ideje"
+        </button>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end;">
+        <button class="btn-secondary" onclick="closeMobileTaskMoveModal()">Odustani</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=4"></script>
 </body>
 </html>

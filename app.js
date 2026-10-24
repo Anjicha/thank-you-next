@@ -804,6 +804,7 @@ function renderTaskCardList(tasks) {
           </div>
           <span class="task-title" onclick="editTask('${task.id}')" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</span>
           ${dateMetaHtml}
+          <button class="task-card-move-btn" onclick="openMobileTaskMoveModal('${task.id}', event)" title="Premjesti zadatak">⇄</button>
           <button class="task-card-delete-btn" onclick="handleTaskDeleteOrArchive('${task.id}', event)" title="${deleteBtnTitle}">✕</button>
         </div>
         ${extraPills.length ? `<div class="task-meta" style="margin-left: 20px; margin-top: 2px;">${extraPills.join("")}</div>` : ""}
@@ -2004,11 +2005,17 @@ function handleZoneDragLeave(e) {
 }
 
 function handleZoneDrop(e, categoryId, targetZone) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.currentTarget.classList.remove("drag-over");
-  const taskId = draggedTaskId || e.dataTransfer.getData("text/plain");
-  moveTaskToZone(taskId, categoryId, targetZone);
+  if (e) {
+    if (typeof e.preventDefault === "function") e.preventDefault();
+    if (typeof e.stopPropagation === "function") e.stopPropagation();
+    if (e.currentTarget && e.currentTarget.classList) {
+      e.currentTarget.classList.remove("drag-over");
+    }
+  }
+  const taskId = draggedTaskId || (e && e.dataTransfer ? e.dataTransfer.getData("text/plain") : null);
+  if (taskId) {
+    moveTaskToZone(taskId, categoryId, targetZone);
+  }
   cleanupDropStyles();
 }
 
@@ -3409,7 +3416,7 @@ function setupMobileTouchDrag() {
   document.addEventListener("touchstart", (e) => {
     const card = e.target.closest(".task-card");
     if (!card) return;
-    if (e.target.closest(".custom-checkbox") || e.target.closest(".task-card-delete-btn")) return;
+    if (e.target.closest(".custom-checkbox") || e.target.closest(".task-card-delete-btn") || e.target.closest(".task-card-move-btn")) return;
 
     touchStartEl = card;
     touchTaskId = card.id ? card.id.replace("task-card-", "") : null;
@@ -3420,14 +3427,15 @@ function setupMobileTouchDrag() {
     touchStartY = t.clientY;
     isDraggingTouch = false;
 
-    // Start drag after 180ms hold
+    // Start drag after 350ms deliberate hold
+    clearTimeout(dragTimer);
     dragTimer = setTimeout(() => {
       isDraggingTouch = true;
       draggedTaskId = touchTaskId;
       draggedCategoryId = null;
 
       if (navigator.vibrate) {
-        try { navigator.vibrate(25); } catch (e) {}
+        try { navigator.vibrate(25); } catch (err) {}
       }
 
       ghostEl = card.cloneNode(true);
@@ -3442,7 +3450,7 @@ function setupMobileTouchDrag() {
       ghostEl.style.top = (t.clientY - 25) + "px";
       document.body.appendChild(ghostEl);
       card.style.opacity = "0.4";
-    }, 180);
+    }, 350);
   }, { passive: true });
 
   document.addEventListener("touchmove", (e) => {
@@ -3452,14 +3460,15 @@ function setupMobileTouchDrag() {
     const dy = Math.abs(t.clientY - touchStartY);
 
     if (!isDraggingTouch) {
-      if (dx > 10 || dy > 10) {
+      if (dx > 7 || dy > 7) {
         clearTimeout(dragTimer);
         touchStartEl = null;
+        touchTaskId = null;
       }
       return;
     }
 
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     if (ghostEl) {
       ghostEl.style.left = (t.clientX - ghostEl.offsetWidth / 2) + "px";
       ghostEl.style.top = (t.clientY - 25) + "px";
@@ -3491,38 +3500,122 @@ function setupMobileTouchDrag() {
 
   const endTouchDrag = () => {
     clearTimeout(dragTimer);
-    if (ghostEl) {
-      ghostEl.remove();
-      ghostEl = null;
-    }
-    if (touchStartEl) {
-      touchStartEl.style.opacity = "";
-    }
-    document.querySelectorAll(".day-cell.drag-over").forEach(el => el.classList.remove("drag-over"));
-
-    if (isDraggingTouch && draggedTaskId && currentDropTarget) {
-      if (currentDropTarget.type === "day" && currentDropTarget.date) {
-        handleCalendarDrop(currentDropTarget.date);
-        if (navigator.vibrate) {
-          try { navigator.vibrate(30); } catch (e) {}
-        }
-      } else if (currentDropTarget.type === "zone" && currentDropTarget.catId) {
-        handleZoneDrop(null, currentDropTarget.catId, currentDropTarget.zone);
-        if (navigator.vibrate) {
-          try { navigator.vibrate(30); } catch (e) {}
+    try {
+      if (isDraggingTouch && draggedTaskId && currentDropTarget) {
+        if (currentDropTarget.type === "day" && currentDropTarget.date) {
+          handleCalendarDrop(currentDropTarget.date);
+          if (navigator.vibrate) {
+            try { navigator.vibrate(30); } catch (err) {}
+          }
+        } else if (currentDropTarget.type === "zone" && currentDropTarget.catId) {
+          handleZoneDrop(null, currentDropTarget.catId, currentDropTarget.zone);
+          if (navigator.vibrate) {
+            try { navigator.vibrate(30); } catch (err) {}
+          }
         }
       }
+    } catch (err) {
+      console.error("Touch drag error:", err);
+    } finally {
+      if (ghostEl) {
+        ghostEl.remove();
+        ghostEl = null;
+      }
+      if (touchStartEl) {
+        touchStartEl.style.opacity = "";
+      }
+      document.querySelectorAll(".day-cell.drag-over").forEach(el => el.classList.remove("drag-over"));
+      isDraggingTouch = false;
+      touchStartEl = null;
+      touchTaskId = null;
+      currentDropTarget = null;
+      draggedTaskId = null;
     }
-
-    isDraggingTouch = false;
-    touchStartEl = null;
-    touchTaskId = null;
-    currentDropTarget = null;
-    draggedTaskId = null;
   };
 
   document.addEventListener("touchend", endTouchDrag);
   document.addEventListener("touchcancel", endTouchDrag);
+}
+
+// ========================================================
+// MOBILE QUICK MOVE MODAL (1-TAP MOVE FOR PHONE USERS)
+// ========================================================
+let activeMobileMoveTaskId = null;
+
+function openMobileTaskMoveModal(taskId, e) {
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  activeMobileMoveTaskId = taskId;
+  const task = appState.tasks.find(t => t.id === taskId);
+  const titleEl = document.getElementById("mobileMoveTaskTitle");
+  if (titleEl && task) {
+    const truncated = task.title.length > 22 ? task.title.substring(0, 20) + "..." : task.title;
+    titleEl.textContent = `Premjesti: "${truncated}"`;
+  }
+  const modal = document.getElementById("mobileTaskMoveModal");
+  if (modal) modal.classList.add("active");
+}
+
+function closeMobileTaskMoveModal() {
+  const modal = document.getElementById("mobileTaskMoveModal");
+  if (modal) modal.classList.remove("active");
+  activeMobileMoveTaskId = null;
+}
+
+function moveActiveMobileTaskToToday() {
+  if (!activeMobileMoveTaskId) return;
+  const today = getTodayStr();
+  const task = appState.tasks.find(t => t.id === activeMobileMoveTaskId);
+  if (task) {
+    task.zone = "calendar";
+    task.date = today;
+    task.rolledOver = false;
+    saveData();
+    renderPlanner();
+    renderCalendar();
+    renderTree();
+    selectCalendarDate(today);
+    showToast(`Premješteno u kalendar za danas (${today})`);
+  }
+  closeMobileTaskMoveModal();
+}
+
+function promptMoveActiveMobileTaskToDate() {
+  if (!activeMobileMoveTaskId) return;
+  const task = appState.tasks.find(t => t.id === activeMobileMoveTaskId);
+  if (!task) return closeMobileTaskMoveModal();
+
+  const chosenDate = prompt("Unesite datum za kalendar (GGGG-MM-DD):", task.date || getTodayStr());
+  if (chosenDate && /^\d{4}-\d{2}-\d{2}$/.test(chosenDate.trim())) {
+    task.zone = "calendar";
+    task.date = chosenDate.trim();
+    task.rolledOver = false;
+    saveData();
+    renderPlanner();
+    renderCalendar();
+    renderTree();
+    selectCalendarDate(task.date);
+    showToast(`Premješteno u kalendar za ${task.date}`);
+  }
+  closeMobileTaskMoveModal();
+}
+
+function moveActiveMobileTaskToZone(targetZone) {
+  if (!activeMobileMoveTaskId) return;
+  const task = appState.tasks.find(t => t.id === activeMobileMoveTaskId);
+  if (task) {
+    task.zone = targetZone;
+    task.date = "";
+    saveData();
+    renderPlanner();
+    renderCalendar();
+    renderTree();
+    const zoneName = ZONE_LABELS[targetZone] || targetZone;
+    showToast(`Premješteno u "${zoneName}"`);
+  }
+  closeMobileTaskMoveModal();
 }
 
 // ========================================================
@@ -3534,36 +3627,50 @@ function initTheme() {
     const savedTheme = localStorage.getItem("thank_you_next_mobile_theme") || "dark";
     applyTheme(savedTheme);
   } else {
+    document.documentElement.classList.remove("theme-light", "theme-dark");
     document.body.classList.remove("theme-light", "theme-dark");
   }
 }
 
 window.addEventListener("resize", () => {
   if (window.innerWidth > 768) {
+    document.documentElement.classList.remove("theme-light", "theme-dark");
     document.body.classList.remove("theme-light", "theme-dark");
   }
 });
 
 function toggleMobileTheme() {
-  const current = document.body.classList.contains("theme-light") ? "light" : "dark";
-  const next = current === "light" ? "dark" : "light";
+  const isLight = document.body.classList.contains("theme-light") || document.documentElement.classList.contains("theme-light");
+  const next = isLight ? "dark" : "light";
   applyTheme(next);
-  localStorage.setItem("thank_you_next_mobile_theme", next);
+  try {
+    localStorage.setItem("thank_you_next_mobile_theme", next);
+  } catch (e) {}
 }
 
 function applyTheme(theme) {
+  const isLight = (theme === "light");
+  document.documentElement.classList.remove("theme-light", "theme-dark");
   document.body.classList.remove("theme-light", "theme-dark");
-  document.body.classList.add(theme === "light" ? "theme-light" : "theme-dark");
-  const darkIcon = document.querySelector(".theme-icon-dark");
-  const lightIcon = document.querySelector(".theme-icon-light");
-  if (darkIcon && lightIcon) {
-    if (theme === "light") {
-      darkIcon.style.display = "inline";
-      lightIcon.style.display = "none";
+  document.documentElement.classList.add(isLight ? "theme-light" : "theme-dark");
+  document.body.classList.add(isLight ? "theme-light" : "theme-dark");
+
+  const iconEl = document.getElementById("themeToggleIcon");
+  const textEl = document.getElementById("themeToggleText");
+  if (iconEl && textEl) {
+    if (isLight) {
+      iconEl.textContent = "🌙";
+      textEl.textContent = "Tamna";
     } else {
-      darkIcon.style.display = "none";
-      lightIcon.style.display = "inline";
+      iconEl.textContent = "☀️";
+      textEl.textContent = "Svijetla";
     }
+  }
+
+  // Update status bar theme-color for iOS Safari
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute("content", isLight ? "#F2F2F7" : "#1C1C1E");
   }
 }
 
@@ -3582,10 +3689,10 @@ const CloudSync = {
     this.databaseUrl = localStorage.getItem("thank_you_next_sync_db_url") || "";
     this.updateStatusBadge("Povezano", "success");
 
-    // Background sync polling every 4 seconds
+    // Background sync polling every 3 seconds
     this.pollTimer = setInterval(() => {
       this.pullUpdate();
-    }, 4000);
+    }, 3000);
 
     // Pull on window focus / tab visibility
     window.addEventListener("focus", () => this.pullUpdate());
@@ -3593,24 +3700,25 @@ const CloudSync = {
       if (!document.hidden) this.pullUpdate();
     });
 
-    // Initial pull
-    setTimeout(() => this.pullUpdate(), 1500);
+    // Initial pull and push
+    setTimeout(() => this.pullUpdate(), 1000);
   },
 
   getEndpoint() {
-    if (this.databaseUrl) {
+    if (this.databaseUrl && this.databaseUrl.trim()) {
       let base = this.databaseUrl.trim().replace(/\/+$/, "");
       if (!base.endsWith(".json")) base += `/sync/${encodeURIComponent(this.syncKey)}.json`;
       return base;
     }
-    return `https://thankyounext-sync-default-rtdb.firebaseio.com/sync/${encodeURIComponent(this.syncKey)}.json`;
+    // High-performance public sync endpoint for Anja
+    return "https://api.restful-api.dev/objects/ff808181a09d98f701a16f7fce040152";
   },
 
   schedulePush() {
     clearTimeout(this.pushTimer);
     this.pushTimer = setTimeout(() => {
       this.pushUpdate();
-    }, 500);
+    }, 400);
   },
 
   async pushUpdate() {
@@ -3620,9 +3728,12 @@ const CloudSync = {
 
     try {
       const payload = {
-        state: appState,
-        lastModified: appState.lastModified || Date.now(),
-        clientDevice: (window.innerWidth <= 768 ? "mobile" : "desktop")
+        name: this.syncKey || "ANJA-NEXT-2026",
+        data: {
+          state: appState,
+          lastModified: appState.lastModified || Date.now(),
+          clientDevice: (window.innerWidth <= 768 ? "mobile" : "desktop")
+        }
       };
 
       const res = await fetch(this.getEndpoint(), {
@@ -3649,7 +3760,8 @@ const CloudSync = {
       const res = await fetch(this.getEndpoint(), { cache: "no-store" });
       if (!res.ok) return;
 
-      const remoteData = await res.json();
+      const remoteObj = await res.json();
+      const remoteData = (remoteObj && remoteObj.data) ? remoteObj.data : remoteObj;
       if (!remoteData || !remoteData.state) return;
 
       const remoteMod = remoteData.lastModified || 0;
